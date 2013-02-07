@@ -9,33 +9,39 @@ module Authorization
       recipient.class_eval do
         include StatefulRolesInstanceMethods
         
-        acts_as_state_machine :initial => :pending
-        state :passive
-        state :pending, :enter => :make_activation_code
-        state :active,  :enter => :do_activate
-        state :suspended
-        state :deleted, :enter => :do_delete
 
-        event :register do
-          transitions :from => :passive, :to => :pending, :guard => Proc.new {|u| !(u.crypted_password.blank? && u.password.blank?) }
-        end
-        
-        event :activate do
-          transitions :from => :pending, :to => :active 
-        end
-        
-        event :suspend do
-          transitions :from => [:passive, :pending, :active], :to => :suspended
-        end
-        
-        event :delete do
-          transitions :from => [:passive, :pending, :active, :suspended], :to => :deleted
-        end
+        state_machine :initial => :pending do
+          state :passive
+          state :pending
+          state :active
+          state :suspended
+          state :deleted
 
-        event :unsuspend do
-          transitions :from => :suspended, :to => :active,  :guard => Proc.new {|u| !u.activated_at.blank? }
-          transitions :from => :suspended, :to => :pending, :guard => Proc.new {|u| !u.activation_code.blank? }
-          transitions :from => :suspended, :to => :passive
+          before_transition any => :pending, do: :make_activation_code
+          before_transition any => :active, do: :do_activate
+          before_transition any => :deleted, do: :do_delete
+
+          event :register do
+            transition :passive => :pending, :unless => Proc.new {|u| (u.crypted_password.blank? && u.password.blank?) }
+          end
+
+          event :activate do
+            transition :pending => :active
+          end
+
+          event :suspend do
+            transition [:passive, :pending, :active] => :suspended
+          end
+
+          event :delete do
+            transition [:passive, :pending, :active, :suspended] => :deleted
+          end
+
+          event :unsuspend do
+            transition :suspended => :active,  :unless => Proc.new {|u| u.activated_at.blank? }
+            transition :suspended => :pending, :unless => Proc.new {|u| u.activation_code.blank? }
+            transition :suspended => :passive
+          end
         end
       end
     end

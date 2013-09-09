@@ -10,7 +10,7 @@ module Authorization
         include StatefulRolesInstanceMethods
         
 
-        state_machine :initial => :pending do
+        state_machine :initial => :passive do
           state :passive
           state :pending
           state :active
